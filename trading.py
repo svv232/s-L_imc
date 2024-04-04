@@ -12,22 +12,27 @@ def linear_regression(x, y):
         return m, c
     except:
         raise  np.linalg.LinAlgError(f'{x.shape}, {y.shape} something went wrong with the shape')
+def std_dev(x):
+    return np.std(x)
 
 class TraderData:
     def __init__(self, data : str = ""):
         if data == "":
             self.regression_model = defaultdict(list)
             self.tick_delta = 100
+            self.std_dev = 0
         else:
             data = jsonpickle.decode(data)
             self.regression_model = data.regression_model
             self.tick_delta = data.tick_delta
+            self.std_dev = data.std_dev
         
     def __str__(self):
         return jsonpickle.encode(self)
     
     def add_point(self,product : str,  y : float):
         self.regression_model[product].append(y)
+        self.std_dev = std_dev(self.regression_model[product])
         
     def slope(self, product : str):
         x_axis = np.array([x * self.tick_delta for x in range(len(self.regression_model[product]))])
