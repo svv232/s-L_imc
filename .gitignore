@@ -2,3 +2,7 @@
 *.log
 imc
 *.json
+!tradingData.json
+
+
+env/
