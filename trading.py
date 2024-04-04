@@ -7,8 +7,8 @@ import jsonpickle
     
 def linear_regression(x, y):
     try:
-        A = np.vstack([x, np.ones(len(x))]).T
-        m, c = np.linalg.lstsq(A, y, rcond=None)[0]
+        xs = np.vstack([np.ones(len(x)), x]).T
+        m, c = np.linalg.lstsq(xs, np.array(y), rcond=None)[0]
         return m, c
     except:
         raise  np.linalg.LinAlgError(f'{x.shape}, {y.shape} something went wrong with the shape')
@@ -32,6 +32,9 @@ class TraderData:
     def slope(self, product : str):
         x_axis = np.array([x * self.tick_delta for x in range(len(self.regression_model[product]))])
         y_axis = np.array(self.regression_model[product])   
+
+        # print("X axis: ", x_axis)
+        # print("Y axis: ", y_axis)
         _, slope = linear_regression(x_axis, y_axis)
         return slope
     
@@ -42,6 +45,8 @@ class Trader:
         
         result = {}
         for product in state.order_depths:
+            print("\n")
+            print("######### Product: " + product + " #########")
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
             acceptable_price = wap(order_depth)
@@ -50,24 +55,8 @@ class Trader:
             slope = trader_data.slope(product)
             
             print("Acceptable price : " + str(acceptable_price))
-            print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
             
-            
-            buy_acceptable_price = acceptable_price + (.5 * slope)
-            
-            if len(order_depth.sell_orders) != 0:
-                best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-                if int(best_ask) < buy_acceptable_price:
-                    print("BUY", str(-best_ask_amount) + "x", best_ask)
-                    orders.append(Order(product, best_ask, -best_ask_amount))
-                    
-            
-            sell_acceptable_price = acceptable_price - (.5 * slope)
-            if len(order_depth.buy_orders) != 0:
-                best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-                if int(best_bid) > sell_acceptable_price:
-                    print("SELL", str(best_bid_amount) + "x", best_bid)
-                    orders.append(Order(product, best_bid, -best_bid_amount))
+            orders = order_volume_optimizer(acceptable_price, order_depth, slope, state.position.get(product, 0))
             
             result[product] = orders
             state.traderData = str(trader_data)
@@ -76,11 +65,6 @@ class Trader:
 				# It will be delivered as TradingState.traderData on next execution.
         conversions = 0
         return result, conversions, state.traderData
-
-# class OrderDepth:
-#     def __init__(self):
-#         self.buy_orders: Dict[int, int] = {}
-#         self.sell_orders: Dict[int, int] = {}
 
 def wap(o: OrderDepth):
     total = 0
@@ -93,3 +77,30 @@ def wap(o: OrderDepth):
         total += price * amount
         volume += amount
     return total / volume if volume != 0 else 0
+  
+
+buy_position_limit = 20
+sell_position_limit = -20
+# We need to make sure we stay within our position limits while maximizing the # amount of volume we can trade.
+# This means balancing the orders we submit to the exchange.
+def order_volume_optimizer(
+  acceptable_price: float,
+  order_depth: OrderDepth,
+  slope: float,
+  position: int,
+):
+  orders = []
+  buy_acceptable_price = acceptable_price + (.5 * slope)
+  sell_acceptable_price = acceptable_price - (.5 * slope)
+  acceptable_asks = sorted([(price, amount) for price, amount in order_depth.sell_orders.items() if price < buy_acceptable_price], key=lambda x: x[0])
+  acceptable_bids = sorted([(price, amount) for price, amount in order_depth.buy_orders.items() if price > sell_acceptable_price], key=lambda x: x[0], reverse=True)
+  
+  print("Slope: ", slope)
+  print("Buy acceptable price: ", buy_acceptable_price)
+  print("Asks: ", order_depth.sell_orders)
+  print("Acceptable asks: ", acceptable_asks)
+  print("Sell acceptable price: ", sell_acceptable_price)
+  print("Bids: ", order_depth.buy_orders)
+  print("Acceptable bids: ", acceptable_bids)
+
+  return []
