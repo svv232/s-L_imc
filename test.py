@@ -5,6 +5,8 @@ import json, sys
 def main():
   trader = Trader()
   traderData = ""
+  position = {}
+  currentSeashells = 0
   with open("./tradingData.json", 'r') as f:
     for line in f:
       data = json.loads(line)
@@ -28,14 +30,30 @@ def main():
         order_depths,
         data["own_trades"],
         data["market_trades"],
-        data["position"],
+        position,
         data["observations"],
       )
 
       results, c, traderData = trader.run(state)
-      print("results", results)
+      # print("results", results)
 
-      sys.stdin.readline()
+      for product in results:
+        for order in results[product]:
+          if product not in position:
+            position[product] = 0
+          position[product] -= order.quantity
+          currentSeashells -= order.quantity * order.price
+        
+        if position.get(product, 0) > 20:
+          print("Position limit exceeded for product: ", product)
+          exit(1)
+        elif position.get(product, 0) < -20:
+          print("Position limit exceeded for product: ", product)
+          exit(1)
+
+
+      print("Current seashells: ", currentSeashells)
+      # sys.stdin.readline()
 
 
 if __name__ == "__main__":
