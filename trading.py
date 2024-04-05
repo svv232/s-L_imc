@@ -1,6 +1,7 @@
 from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import List
 from collections import defaultdict
+from collections import deque
 
 import numpy as np
 import jsonpickle
@@ -15,10 +16,44 @@ def linear_regression(x, y):
 def std_dev(x):
     return np.std(x)
 
+
+class CircularQ:
+    """
+    A Circular Buffer that serves as a simple sliding window
+    """
+    def __init__(self, size=10):
+        self.size = size
+        self.buff = []
+        self.idx = 0
+
+    def add(self, item):
+        if len(self.buff) < self.size:
+            self.buff.append(item)
+        else:
+            self.buff[self.idx % self.size] = item
+            
+        self.idx += 1
+
+    def __iter__(self):
+        if len(self.buff) < self.size:
+            for i in self.buff:
+                yield i
+        else:
+            # yield everything after index and then before to preserve lru order
+            pivot = self.idx % self.size
+            for d in range(pivot, len(self.buff)):
+                yield self.buff[d]
+            for d in range(pivot):
+                yield self.buff[d]
+                
+    def __len__(self):
+        return len(self.buff)
+    
+
 class TraderData:
     def __init__(self, data : str = ""):
         if data == "":
-            self.regression_model = defaultdict(list)
+            self.regression_model = defaultdict(CircularQ)
             self.tick_delta = 100
             self.std_dev = 0
         else:
@@ -31,12 +66,12 @@ class TraderData:
         return jsonpickle.encode(self)
     
     def add_point(self,product : str,  y : float):
-        self.regression_model[product].append(y)
-        self.std_dev = std_dev(self.regression_model[product])
+        self.regression_model[product].add(y)
+        self.std_dev = std_dev(self.regression_model[product].buff)
         
     def slope(self, product : str):
         x_axis = np.array([x * self.tick_delta for x in range(len(self.regression_model[product]))])
-        y_axis = np.array(self.regression_model[product])   
+        y_axis = np.array([x for x in self.regression_model[product]])   
 
         # print("X axis: ", x_axis)
         # print("Y axis: ", y_axis)
