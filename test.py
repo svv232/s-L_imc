@@ -1,12 +1,15 @@
 from trading import Trader
 from datamodel import OrderDepth, TradingState
 import json, sys
+import pandas as pd
+import matplotlib.pyplot as plt
 
 def main():
   trader = Trader()
   traderData = ""
   position = {}
   currentSeashells = 0
+  dps = []
   with open("./tradingData.json", 'r') as f:
     for line in f:
       data = json.loads(line)
@@ -37,11 +40,13 @@ def main():
       results, c, traderData = trader.run(state)
       # print("results", results)
 
+      n_orders = 0
       for product in results:
         for order in results[product]:
+          n_orders += 1
           if product not in position:
             position[product] = 0
-          position[product] -= order.quantity
+          position[product] += order.quantity
           currentSeashells -= order.quantity * order.price
         
         if position.get(product, 0) > 20:
@@ -53,7 +58,17 @@ def main():
 
 
       print("Current seashells: ", currentSeashells)
-      # sys.stdin.readline()
+      dps.append(currentSeashells)
+      if n_orders > 0:
+        sys.stdin.readline()
+        pass
+
+  print("Final seashells: ", currentSeashells)
+  s = pd.Series(dps)
+  s.plot.line()
+  plt.show()
+
+  
 
 
 if __name__ == "__main__":

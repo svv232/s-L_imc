@@ -92,14 +92,15 @@ class Trader:
             trader_data = TraderData(state.traderData)
             trader_data.add_point(product, acceptable_price)
             slope = trader_data.slope(product)
+            slope = 0 
             position = state.position.get(product, 0)
             print("Acceptable price : " + str(acceptable_price))
             
             orders = order_volume_optimizer(product, acceptable_price, order_depth, slope, position)
-            
+
             expected_position = position
             for order in orders:
-                expected_position -= order.quantity
+                expected_position += order.quantity
             print("Expected position: ", expected_position)
             result[product] = orders
             state.traderData = str(trader_data)
@@ -122,6 +123,7 @@ def wap(o: OrderDepth):
         volume += amount
     return total / volume if volume != 0 else 0
   
+
 
 buy_position_limit = 20
 sell_position_limit = -20
@@ -154,20 +156,21 @@ def order_volume_optimizer(
   ask_order_capacity = sum([amount for _, amount in acceptable_asks])
   bid_order_capacity = sum([amount for _, amount in acceptable_bids])
   
-  order_diff = ask_order_capacity - bid_order_capacity
-  n_ask = 0
-  n_bid = 0
-  if order_diff > 0:
-    n_ask = ask_order_capacity - order_diff
+  potential_position = (position + ask_order_capacity - bid_order_capacity)
+  if potential_position > buy_position_limit:
+    diff = potential_position - buy_position_limit
+    n_ask = ask_order_capacity - diff
     n_bid = bid_order_capacity
+  elif potential_position < sell_position_limit:
+    diff = sell_position_limit - potential_position
+    n_ask = ask_order_capacity
+    n_bid = bid_order_capacity - diff
   else:
     n_ask = ask_order_capacity
-    n_bid = bid_order_capacity + order_diff
+    n_bid = bid_order_capacity
 
-  potential_position = position + order_diff
-
-
-  print("Potential position delta: ", potential_position)
+  new_potential_position = position + n_ask - n_bid
+  print("New potential position: ", new_potential_position)
 
   n_ask_orders_to_place = n_ask
   n_bid_orders_to_place = n_bid
