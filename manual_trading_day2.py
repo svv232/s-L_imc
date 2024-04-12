@@ -50,6 +50,7 @@ def find_optimal_trade_path(graph, currency=start_currency, path = None, cumm_ra
             
         else:
             rate = graph[currency][c]
+            # this works because all rates are unique, in reality we want to track edges
             if rate not in seen:
                 new_seen = seen.copy()
                 new_seen.add(rate)
